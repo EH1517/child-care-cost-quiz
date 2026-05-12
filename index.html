@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What Does Child Care Cost? — Child Care Cost Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f3f4f6;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .dollar-input {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-align: center;
+      width: 100%;
+      border: 2px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      outline: none;
+      transition: border-color 0.15s;
+      color: #111827;
+    }
+    .dollar-input:focus { border-color: #1d4ed8; }
+    .dollar-input::placeholder { color: #9ca3af; font-weight: 400; }
+    .btn-primary {
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: inline-block;
+    }
+    .btn-primary:hover { background: #1e40af; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: #374151;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      display: inline-block;
+    }
+    .btn-ghost:hover { background: #f9fafb; border-color: #9ca3af; }
+    .radio-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .radio-card:hover { border-color: #93c5fd; background: #eff6ff; }
+    .radio-card.selected { border-color: #1d4ed8; background: #eff6ff; }
+    .progress-step {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      display: inline-block;
+    }
+    .progress-step.done { background: #93c5fd; }
+    .progress-step.current { background: #1d4ed8; }
+    .reveal-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #e5e7eb;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .reveal-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 2.5rem;
+    }
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    .tooltip-text {
+      visibility: hidden;
+      opacity: 0;
+      background: #1f2937;
+      color: #f9fafb;
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 240px;
+      z-index: 10;
+      transition: opacity 0.15s;
+      pointer-events: none;
+    }
+    .tooltip:hover .tooltip-text,
+    .tooltip:focus-within .tooltip-text { visibility: visible; opacity: 1; }
+    .difference-positive { color: #dc2626; }
+    .difference-negative { color: #16a34a; }
+    .difference-neutral { color: #6b7280; }
+    @media (max-width: 640px) {
+      .dollar-input { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="min-h-screen flex flex-col"></div>
+
+  <script>
+  // ==========================================================================
+  // DATA LAYER
+  // ==========================================================================
+  //
+  // Source: Child Care in America: 2024 Affordability Analysis
+  //         Child Care Aware® of America (CCAoA)
+  //         Data collected January 2025; prices reflect 2024 annual averages
+  //         PDF: https://info.childcareaware.org/hubfs/Affordability_Analysis_Updated_2024.pdf
+  //
+  // Age band mapping note:
+  //   The spec requested 5 bands (under 2, 2-3, 3-4, 4-5, school-age).
+  //   CCAoA publishes only 4 bands — mapped as follows:
+  //     "infant"    → CCAoA "Infant"         (typically under ~18 mo–2 yrs; state-defined)
+  //     "toddler"   → CCAoA "Toddler"        (approximately ages 1–3; state-defined)
+  //     "preschool" → CCAoA "4-Year-Old"     (approximately ages 3–5 / pre-K; NO separate 3-4 band)
+  //     "schoolAge" → CCAoA "Before/After School" (elementary-age children)
+  //   The spec's separate "age 3-4" and "age 4-5" bands do not exist in CCAoA data;
+  //   both map to a single "4-Year-Old / Preschool" category.
+  //
+  // null = not reported (NR) or not available (NA) for that state/setting/band.
+  // "New Mexico" has no data; CCAoA notes NM no longer conducts market rate surveys.
+  //
+  // * Alabama, California, Florida, Louisiana, Maine, Mississippi, New Jersey,
+  //   Pennsylvania, Rhode Island, West Virginia, Wyoming: data from state's most
+  //   recent Market Rate Survey (did not report on 2025 CCAoA survey).
+  //
+  // Two care settings:
+  //   "center" = licensed child care center
+  //   "fcc"    = family child care home (provider cares for children in their own home)
+
+  const STATE_DATA = {
+    "Alabama":          { center: { infant: 8632,  toddler: 8424,  preschool: 8008,  schoolAge: 5226  }, fcc: { infant: 7670,  toddler: 7527,  preschool: 7332,  schoolAge: 5090  } },
+    "Alaska":           { center: { infant: 12107, toddler: 11304, preschool: 9883,  schoolAge: 6324  }, fcc: { infant: 10809, toddler: 9265,  preschool: 8610,  schoolAge: 5559  } },
+    "Arizona":          { center: { infant: 15964, toddler: 13390, preschool: 11680, schoolAge: 5850  }, fcc: { infant: 10920, toddler: 10400, preschool: 10400, schoolAge: 5850  } },
+    "Arkansas":         { center: { infant: 9178,  toddler: 8801,  preschool: 8320,  schoolAge: 3397  }, fcc: { infant: 7963,  toddler: 7727,  preschool: 7745,  schoolAge: 4274  } },
+    "California":       { center: { infant: 22628, toddler: null,  preschool: 16665, schoolAge: 10627 }, fcc: { infant: 19022, toddler: null,  preschool: 16763, schoolAge: 10293 } },
+    "Colorado":         { center: { infant: 20978, toddler: 17479, preschool: 14800, schoolAge: 8292  }, fcc: { infant: 13666, toddler: 13666, preschool: 12830, schoolAge: 8068  } },
+    "Connecticut":      { center: { infant: 18492, toddler: 18829, preschool: 15297, schoolAge: 5967  }, fcc: { infant: 14305, toddler: null,  preschool: 13201, schoolAge: 5928  } },
+    "Delaware":         { center: { infant: 16617, toddler: 14668, preschool: 13218, schoolAge: 5476  }, fcc: { infant: 10997, toddler: 10358, preschool: 9968,  schoolAge: 4294  } },
+    "District of Columbia": { center: { infant: 26193, toddler: 24087, preschool: 20981, schoolAge: null  }, fcc: { infant: 21382, toddler: 21022, preschool: 19685, schoolAge: null  } },
+    "Florida":          { center: { infant: 13011, toddler: 11461, preschool: 9409,  schoolAge: 5238  }, fcc: { infant: 11201, toddler: 10185, preschool: 8592,  schoolAge: 5094  } },
+    "Georgia":          { center: { infant: 11066, toddler: 10537, preschool: 9573,  schoolAge: 6568  }, fcc: { infant: 8407,  toddler: 8043,  preschool: 7802,  schoolAge: 5661  } },
+    "Hawaii":           { center: { infant: 24115, toddler: 18852, preschool: 13992, schoolAge: 7402  }, fcc: { infant: 11632, toddler: 11148, preschool: 11028, schoolAge: 10694 } },
+    "Idaho":            { center: { infant: 10608, toddler: 9996,  preschool: 9201,  schoolAge: 6444  }, fcc: { infant: 7380,  toddler: 7308,  preschool: 7152,  schoolAge: 5328  } },
+    "Illinois":         { center: { infant: 19807, toddler: 18736, preschool: 17238, schoolAge: 4538  }, fcc: { infant: 12283, toddler: 12283, preschool: 10439, schoolAge: 3524  } },
+    "Indiana":          { center: { infant: 16478, toddler: 16002, preschool: 12531, schoolAge: 6394  }, fcc: { infant: 9508,  toddler: 9102,  preschool: 8470,  schoolAge: 5143  } },
+    "Iowa":             { center: { infant: 12694, toddler: 11729, preschool: 10100, schoolAge: 3572  }, fcc: { infant: 8596,  toddler: 8443,  preschool: 8285,  schoolAge: 3067  } },
+    "Kansas":           { center: { infant: 15156, toddler: 11071, preschool: 9217,  schoolAge: 2254  }, fcc: { infant: 7639,  toddler: 6890,  preschool: 7750,  schoolAge: 2742  } },
+    "Kentucky":         { center: { infant: 12740, toddler: 12220, preschool: 10712, schoolAge: 5850  }, fcc: { infant: 9880,  toddler: 9360,  preschool: 9360,  schoolAge: 5148  } },
+    "Louisiana":        { center: { infant: 10847, toddler: 9997,  preschool: 9378,  schoolAge: 5841  }, fcc: { infant: null,  toddler: null,  preschool: null,  schoolAge: null  } },
+    "Maine":            { center: { infant: 15730, toddler: 14820, preschool: 14144, schoolAge: 7683  }, fcc: { infant: 11830, toddler: 11206, preschool: 10790, schoolAge: 6728  } },
+    "Maryland":         { center: { infant: 25321, toddler: 22594, preschool: 15601, schoolAge: 10226 }, fcc: { infant: 15919, toddler: 15676, preschool: 13416, schoolAge: 8505  } },
+    "Massachusetts":    { center: { infant: 26343, toddler: 24314, preschool: 20669, schoolAge: 17944 }, fcc: { infant: 17510, toddler: 17511, preschool: 15056, schoolAge: 7583  } },
+    "Michigan":         { center: { infant: 13454, toddler: 13555, preschool: 12246, schoolAge: 5468  }, fcc: { infant: 9458,  toddler: 9959,  preschool: 10355, schoolAge: 5448  } },
+    "Minnesota":        { center: { infant: 20421, toddler: 18042, preschool: 15733, schoolAge: null  }, fcc: { infant: 9821,  toddler: 9434,  preschool: 8978,  schoolAge: null  } },
+    "Mississippi":      { center: { infant: 7696,  toddler: 7254,  preschool: 6864,  schoolAge: 4290  }, fcc: { infant: 6188,  toddler: 5980,  preschool: 5720,  schoolAge: 3588  } },
+    "Missouri":         { center: { infant: 13780, toddler: 11700, preschool: 9568,  schoolAge: 4056  }, fcc: { infant: 9984,  toddler: 8996,  preschool: 8320,  schoolAge: 3432  } },
+    "Montana":          { center: { infant: 15080, toddler: 15080, preschool: 14300, schoolAge: 4875  }, fcc: { infant: 11700, toddler: 11700, preschool: 10400, schoolAge: 3900  } },
+    "Nebraska":         { center: { infant: 18147, toddler: 17184, preschool: 15738, schoolAge: null  }, fcc: { infant: 13383, toddler: 13383, preschool: 13383, schoolAge: null  } },
+    "Nevada":           { center: { infant: 12659, toddler: 11442, preschool: 10605, schoolAge: 6140  }, fcc: { infant: 9703,  toddler: 9239,  preschool: 8982,  schoolAge: 4954  } },
+    "New Hampshire":    { center: { infant: 16040, toddler: 14870, preschool: 13042, schoolAge: 4826  }, fcc: { infant: 11708, toddler: 11432, preschool: 11418, schoolAge: 3827  } },
+    "New Jersey":       { center: { infant: 20213, toddler: 19448, preschool: 17503, schoolAge: 5990  }, fcc: { infant: 12502, toddler: 11113, preschool: 11113, schoolAge: 7960  } },
+    "New Mexico":       null, // No data — NM no longer conducts a market rate survey (CCAoA methodology note)
+    "New York":         { center: { infant: 20439, toddler: 18661, preschool: 17343, schoolAge: 12447 }, fcc: { infant: 16415, toddler: 15616, preschool: 15616, schoolAge: 13299 } },
+    "North Carolina":   { center: { infant: 12370, toddler: 11694, preschool: 10381, schoolAge: 5811  }, fcc: { infant: 9961,  toddler: 9591,  preschool: 9047,  schoolAge: 5693  } },
+    "North Dakota":     { center: { infant: 12299, toddler: 11580, preschool: 10869, schoolAge: null  }, fcc: { infant: 10141, toddler: 9801,  preschool: 9473,  schoolAge: null  } },
+    "Ohio":             { center: { infant: 13780, toddler: 12376, preschool: 11752, schoolAge: 6435  }, fcc: { infant: 10556, toddler: 10192, preschool: 9048,  schoolAge: 5967  } },
+    "Oklahoma":         { center: { infant: 10809, toddler: 10060, preschool: 9415,  schoolAge: 7326  }, fcc: { infant: 9399,  toddler: 9122,  preschool: 8577,  schoolAge: 7990  } },
+    "Oregon":           { center: { infant: 19500, toddler: 17368, preschool: 13260, schoolAge: null  }, fcc: { infant: 15808, toddler: 13832, preschool: 13728, schoolAge: null  } },
+    "Pennsylvania":     { center: { infant: 14910, toddler: 14180, preschool: 12453, schoolAge: 7937  }, fcc: { infant: 10994, toddler: 10428, preschool: 9685,  schoolAge: 6297  } },
+    "Rhode Island":     { center: { infant: 18486, toddler: null,  preschool: 16212, schoolAge: 10920 }, fcc: { infant: 14300, toddler: null,  preschool: 13000, schoolAge: 8775  } },
+    "South Carolina":   { center: { infant: 10474, toddler: 10308, preschool: 9691,  schoolAge: 8277  }, fcc: { infant: 8126,  toddler: 7449,  preschool: 7223,  schoolAge: 6321  } },
+    "South Dakota":     { center: { infant: 8632,  toddler: 8632,  preschool: 8070,  schoolAge: 5460  }, fcc: { infant: 6822,  toddler: 6822,  preschool: 6635,  schoolAge: 4836  } },
+    "Tennessee":        { center: { infant: 13126, toddler: 12063, preschool: 10840, schoolAge: 4402  }, fcc: { infant: 9415,  toddler: 9430,  preschool: 8689,  schoolAge: 5618  } },
+    "Texas":            { center: { infant: 11349, toddler: 10921, preschool: 10225, schoolAge: 6782  }, fcc: { infant: 10010, toddler: 9957,  preschool: 9582,  schoolAge: 6300  } },
+    "Utah":             { center: { infant: 14160, toddler: 11328, preschool: 9876,  schoolAge: 5940  }, fcc: { infant: 10800, toddler: 8700,  preschool: 8160,  schoolAge: 5760  } },
+    "Vermont":          { center: { infant: 18710, toddler: 17988, preschool: 15877, schoolAge: 6442  }, fcc: { infant: 12395, toddler: 11952, preschool: 11818, schoolAge: 5595  } },
+    "Virginia":         { center: { infant: 16796, toddler: 15964, preschool: 13884, schoolAge: 5772  }, fcc: { infant: 13052, toddler: 12480, preschool: 12116, schoolAge: 4095  } },
+    "Washington":       { center: { infant: 21348, toddler: 19236, preschool: 16908, schoolAge: 5196  }, fcc: { infant: 18000, toddler: 16200, preschool: 14556, schoolAge: 5460  } },
+    "West Virginia":    { center: { infant: 10439, toddler: 9903,  preschool: 9368,  schoolAge: null  }, fcc: { infant: 8565,  toddler: 7762,  preschool: 7762,  schoolAge: null  } },
+    "Wisconsin":        { center: { infant: 17963, toddler: 18239, preschool: 15039, schoolAge: 6226  }, fcc: { infant: 12319, toddler: 14743, preschool: 11088, schoolAge: 6568  } },
+    "Wyoming":          { center: { infant: 12784, toddler: 11897, preschool: 11229, schoolAge: 6249  }, fcc: { infant: 10704, toddler: 10278, preschool: 9747,  schoolAge: 6080  } },
+  };
+
+  // Approximate 2023 median household income by state (Census Bureau ACS data)
+  // Used for affordability context in the summary screen; these are all-household medians.
+  const MEDIAN_INCOME = {
+    "Alabama": 59674, "Alaska": 91141, "Arizona": 72581, "Arkansas": 55432,
+    "California": 91905, "Colorado": 89620, "Connecticut": 90373, "Delaware": 79325,
+    "District of Columbia": 101722, "Florida": 67617, "Georgia": 71355, "Hawaii": 94814,
+    "Idaho": 67473, "Illinois": 79253, "Indiana": 67173, "Iowa": 69708,
+    "Kansas": 68601, "Kentucky": 60183, "Louisiana": 57852, "Maine": 68251,
+    "Maryland": 98461, "Massachusetts": 96505, "Michigan": 65060, "Minnesota": 87442,
+    "Mississippi": 52985, "Missouri": 66171, "Montana": 67631, "Nebraska": 74594,
+    "Nevada": 73095, "New Hampshire": 90845, "New Jersey": 100450, "New Mexico": 58722,
+    "New York": 78809, "North Carolina": 68376, "North Dakota": 75281, "Ohio": 66990,
+    "Oklahoma": 60096, "Oregon": 80287, "Pennsylvania": 73170, "Rhode Island": 80568,
+    "South Carolina": 65836, "South Dakota": 71626, "Tennessee": 68053, "Texas": 73035,
+    "Utah": 85448, "Vermont": 74015, "Virginia": 89374, "Washington": 96069,
+    "West Virginia": 55217, "Wisconsin": 73382, "Wyoming": 72495,
+  };
+
+  // Age band definitions
+  // NOTE: CCAoA does not publish separate "3-4" and "4-5" bands.
+  // "preschool" here maps to CCAoA's "4-Year-Old" category (~ages 3-5).
+  const AGE_BANDS = [
+    {
+      key: 'infant',
+      label: 'Infant',
+      ageDesc: 'Under age 2',
+      questionLabel: 'Infant Care — Under Age 2',
+      note: 'Full-time care for an infant. CCAoA\'s infant category covers children under approximately age 2; the exact upper bound varies by state.',
+    },
+    {
+      key: 'toddler',
+      label: 'Toddler',
+      ageDesc: 'Approx. age 1–3',
+      questionLabel: 'Toddler Care — Approximately Age 1–3',
+      note: 'Full-time care for a toddler. CCAoA\'s toddler category covers approximately ages 1–3; exact age bounds vary by state.',
+    },
+    {
+      key: 'preschool',
+      label: 'Preschool / Pre-K',
+      ageDesc: 'Approx. age 3–5',
+      questionLabel: 'Preschool / Pre-K Care — Approximately Age 3–5',
+      note: 'CCAoA labels this their "4-Year-Old" category. It covers preschool-age children broadly, roughly ages 3–5. There is no separate data for ages 3–4 vs. 4–5 in the CCAoA report.',
+    },
+    {
+      key: 'schoolAge',
+      label: 'School-Age',
+      ageDesc: 'Before & after school',
+      questionLabel: 'School-Age Care — Before & After School',
+      note: 'Before- and after-school care for elementary-age children during the school year.',
+    },
+  ];
+
+  // ==========================================================================
+  // QUIZ STATE
+  // ==========================================================================
+
+  const quiz = {
+    screen: 'welcome',      // welcome | setup | question | reveal | summary
+    state: '',
+    setting: 'center',      // center | fcc
+    questions: [],          // [{band object, actual value}]
+    qIndex: 0,
+    guesses: [],            // numbers, parallel to questions
+    currentGuess: '',
+  };
+
+  // ==========================================================================
+  // UTILITIES
+  // ==========================================================================
+
+  function fmt(n) {
+    if (n == null) return 'N/A';
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function fmtPct(n) {
+    return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+  }
+
+  function parseGuess(s) {
+    const num = parseFloat(s.replace(/[$,\s]/g, ''));
+    return isNaN(num) ? null : num;
+  }
+
+  function formatInputValue(raw) {
+    const digits = raw.replace(/[^\d]/g, '');
+    if (!digits) return '';
+    const n = parseInt(digits, 10);
+    return '$' + n.toLocaleString('en-US');
+  }
+
+  function computeNationalAvg(band, setting) {
+    const vals = Object.values(STATE_DATA)
+      .filter(d => d !== null)
+      .map(d => d[setting][band])
+      .filter(v => v !== null);
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+
+  function buildQuestions(stateName, setting) {
+    const data = STATE_DATA[stateName];
+    if (!data) return [];
+    return AGE_BANDS
+      .map(band => ({ band, actual: data[setting][band.key] }))
+      .filter(q => q.actual !== null);
+  }
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  function render() {
+    const app = document.getElementById('app');
+    switch (quiz.screen) {
+      case 'welcome':  app.innerHTML = renderWelcome(); break;
+      case 'setup':    app.innerHTML = renderSetup();   break;
+      case 'question': app.innerHTML = renderQuestion(); break;
+      case 'reveal':   app.innerHTML = renderReveal();  break;
+      case 'summary':  app.innerHTML = renderSummary(); break;
+    }
+    attachHandlers();
+  }
+
+  // --------------------------------------------------------------------------
+  // WELCOME
+  // --------------------------------------------------------------------------
+
+  function renderWelcome() {
+    return `
+    <div class="flex flex-col min-h-screen">
+      <main class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="card max-w-xl w-full p-8 sm:p-12">
+          <div class="mb-6">
+            <span class="text-xs font-semibold uppercase tracking-widest text-blue-700 bg-blue-50 px-3 py-1 rounded-full">Child Care Cost Quiz</span>
+          </div>
+          <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-4">
+            What does child care actually cost?
+          </h1>
+          <p class="text-gray-600 text-lg leading-relaxed mb-6">
+            Child care is one of the largest expenses for American families — but most people have no idea what it really costs.
+          </p>
+          <p class="text-gray-600 leading-relaxed mb-8">
+            This quiz asks you to guess the annual cost of care for children at different ages in your state. After each guess, you'll see the actual price from Child Care Aware of America's most recent data.
+          </p>
+          <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8 text-sm text-amber-900">
+            <strong>About the data:</strong> Prices are 2024 annual averages from Child Care Aware of America's
+            <em>Child Care in America: 2024 Affordability Analysis</em>, based on a January 2025 survey of
+            state child care resource and referral networks. Prices reflect what providers charge, which is
+            often below the true cost of care. Individual costs vary significantly.
+          </div>
+          <button class="btn-primary w-full sm:w-auto" id="btn-start">
+            Start the quiz
+          </button>
+        </div>
+      </main>
+      ${renderFooter()}
+    </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // SETUP
+  // --------------------------------------------------------------------------
+
+  function renderSetup() {
+    const states = Object.keys(STATE_DATA).sort();
+    const stateOptions = states.map(s => {
+      const disabled = STATE_DATA[s] === null ? 'disabled' : '';
+      const label = STATE_DATA[s] === null ? `${s} (no data available)` : s;
+      return `<option value="${s}" ${disabled} ${quiz.state === s ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+
+    const settingError = quiz.state && STATE_DATA[quiz.state] && quiz.setting === 'fcc' &&
+      Object.values(STATE_DATA[quiz.state].fcc).every(v => v === null)
+      ? `<p class="text-sm text-red-600 mt-2">Family child care data is not available for ${quiz.state}. Please select Child Care Center.</p>`
+      : '';
+
+    return `
+    <div class="flex flex-col min-h-screen">
+      <main class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="card max-w-xl w-full p-8">
+          <button class="text-sm text-gray-500 hover:text-gray-700 mb-6 flex items-center gap-1" id="btn-back-welcome">
+            ← Back
+          </button>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Choose your state and care setting</h2>
+          <p class="text-gray-500 text-sm mb-8">You'll guess the annual cost for each age group in your selected state.</p>
+
+          <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 mb-2" for="state-select">State</label>
+            <select id="state-select" class="w-full border-2 border-gray-200 rounded-lg px-4 py-3 text-gray-900 focus:outline-none focus:border-blue-700 bg-white text-base">
+              <option value="" disabled ${!quiz.state ? 'selected' : ''}>Choose a state…</option>
+              ${stateOptions}
+            </select>
+          </div>
+
+          <div class="mb-8">
+            <div class="flex items-center gap-2 mb-3">
+              <label class="block text-sm font-semibold text-gray-700">Care setting</label>
+              <div class="tooltip">
+                <button class="w-5 h-5 rounded-full bg-gray-200 text-gray-600 text-xs font-bold flex items-center justify-center hover:bg-gray-300 focus:outline-none" tabindex="0">?</button>
+                <span class="tooltip-text">
+                  <strong>Child care centers</strong> are licensed facilities with professional staff, often serving many children in age-grouped classrooms.<br><br>
+                  <strong>Family child care homes</strong> are licensed providers who care for a small group of children in their own residence.
+                </span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-3">
+              <label class="radio-card ${quiz.setting === 'center' ? 'selected' : ''}" id="radio-center">
+                <input type="radio" name="setting" value="center" class="mt-0.5 accent-blue-700 shrink-0" ${quiz.setting === 'center' ? 'checked' : ''}>
+                <div>
+                  <div class="font-semibold text-gray-900 text-sm">Child care center</div>
+                  <div class="text-xs text-gray-500 mt-0.5">Licensed facility; typically serves children in age-grouped classrooms</div>
+                </div>
+              </label>
+              <label class="radio-card ${quiz.setting === 'fcc' ? 'selected' : ''}" id="radio-fcc">
+                <input type="radio" name="setting" value="fcc" class="mt-0.5 accent-blue-700 shrink-0" ${quiz.setting === 'fcc' ? 'checked' : ''}>
+                <div>
+                  <div class="font-semibold text-gray-900 text-sm">Family child care home</div>
+                  <div class="text-xs text-gray-500 mt-0.5">Licensed provider caring for a small group in their own home</div>
+                </div>
+              </label>
+            </div>
+            ${settingError}
+          </div>
+
+          <button class="btn-primary w-full" id="btn-begin" ${
+            !quiz.state || STATE_DATA[quiz.state] === null ||
+            (quiz.state && STATE_DATA[quiz.state] && quiz.setting === 'fcc' &&
+              Object.values(STATE_DATA[quiz.state].fcc).every(v => v === null))
+              ? 'disabled' : ''}>
+            Begin quiz
+          </button>
+        </div>
+      </main>
+      ${renderFooter()}
+    </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // QUESTION
+  // --------------------------------------------------------------------------
+
+  function renderQuestion() {
+    const q = quiz.questions[quiz.qIndex];
+    const total = quiz.questions.length;
+    const progress = renderProgress(quiz.qIndex, total);
+
+    return `
+    <div class="flex flex-col min-h-screen">
+      <main class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="card max-w-xl w-full p-8">
+          ${progress}
+          <div class="mt-6 mb-2">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-400">${quiz.state} · ${quiz.setting === 'center' ? 'Child Care Center' : 'Family Child Care Home'}</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-bold text-gray-900 mb-1">${q.band.questionLabel}</h2>
+          <p class="text-gray-500 text-sm mb-8">${q.band.note}</p>
+
+          <p class="text-sm font-semibold text-gray-700 mb-3 text-center">What is the average annual cost?</p>
+          <div class="mb-2">
+            <input
+              type="text"
+              class="dollar-input"
+              id="guess-input"
+              inputmode="numeric"
+              placeholder="$0"
+              value="${quiz.currentGuess}"
+              autocomplete="off"
+            >
+          </div>
+          <p class="text-xs text-gray-400 text-center mb-8">Enter an annual dollar amount (e.g. $12,000)</p>
+
+          <button class="btn-primary w-full" id="btn-submit-guess" ${!parseGuess(quiz.currentGuess) ? 'disabled' : ''}>
+            See the answer
+          </button>
+        </div>
+      </main>
+      ${renderFooter()}
+    </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // REVEAL
+  // --------------------------------------------------------------------------
+
+  function renderReveal() {
+    const q = quiz.questions[quiz.qIndex];
+    const guess = quiz.guesses[quiz.qIndex];
+    const actual = q.actual;
+    const diff = guess - actual;
+    const pct = (diff / actual) * 100;
+    const isLast = quiz.qIndex === quiz.questions.length - 1;
+    const absPercent = Math.abs(pct);
+
+    let diffClass = 'difference-neutral';
+    let diffLabel = '';
+    if (Math.abs(pct) < 2) {
+      diffLabel = 'Very close!';
+      diffClass = 'difference-neutral';
+    } else if (diff > 0) {
+      diffLabel = `Your guess was ${fmtPct(pct)} higher than the actual cost`;
+      diffClass = 'difference-positive';
+    } else {
+      diffLabel = `Your guess was ${fmtPct(Math.abs(pct))} lower than the actual cost`;
+      diffClass = 'difference-negative';
+    }
+
+    // Bar visualization: guess vs actual
+    const maxVal = Math.max(guess, actual);
+    const guessPct = Math.min(100, Math.round((guess / maxVal) * 100));
+    const actualPct = 100;
+
+    const nationalAvg = computeNationalAvg(q.band.key, quiz.setting);
+    const vsNational = ((actual - nationalAvg) / nationalAvg) * 100;
+    const vsNationalStr = vsNational >= 0
+      ? `${vsNational.toFixed(0)}% above the national average (${fmt(nationalAvg)})`
+      : `${Math.abs(vsNational).toFixed(0)}% below the national average (${fmt(nationalAvg)})`;
+
+    return `
+    <div class="flex flex-col min-h-screen">
+      <main class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="card max-w-xl w-full p-8">
+          ${renderProgress(quiz.qIndex, quiz.questions.length, true)}
+          <div class="mt-6 mb-2">
+            <span class="text-xs font-semibold uppercase tracking-widest text-gray-400">${quiz.state} · ${quiz.setting === 'center' ? 'Child Care Center' : 'Family Child Care Home'}</span>
+          </div>
+          <h2 class="text-xl font-bold text-gray-900 mb-6">${q.band.questionLabel}</h2>
+
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-gray-50 rounded-lg p-4 text-center">
+              <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Your guess</div>
+              <div class="text-2xl font-bold text-gray-700">${fmt(guess)}</div>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4 text-center border-2 border-blue-100">
+              <div class="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">Actual cost</div>
+              <div class="text-2xl font-bold text-blue-800">${fmt(actual)}</div>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+              <span>Your guess</span>
+              <span>${fmt(guess)}</span>
+            </div>
+            <div class="reveal-bar"><div class="reveal-bar-fill bg-gray-300" id="bar-guess" style="width:0%"></div></div>
+            <div class="flex justify-between text-xs text-gray-500 mt-2 mb-1">
+              <span>Actual cost</span>
+              <span>${fmt(actual)}</span>
+            </div>
+            <div class="reveal-bar"><div class="reveal-bar-fill bg-blue-500" id="bar-actual" style="width:0%"></div></div>
+          </div>
+
+          <p class="text-sm font-semibold ${diffClass} mb-1">${diffLabel}</p>
+          <p class="text-xs text-gray-400 mb-4">Difference: ${fmt(Math.abs(diff))}</p>
+
+          <p class="text-xs text-gray-500 bg-gray-50 rounded-lg px-4 py-3 mb-6">
+            ${quiz.state}'s ${q.band.label.toLowerCase()} cost in a ${quiz.setting === 'center' ? 'center' : 'family child care home'} is <strong>${vsNationalStr}</strong>.
+          </p>
+
+          <button class="btn-primary w-full" id="btn-next">
+            ${isLast ? 'See summary' : 'Next age group →'}
+          </button>
+        </div>
+      </main>
+      ${renderFooter()}
+    </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // SUMMARY
+  // --------------------------------------------------------------------------
+
+  function renderSummary() {
+    const total = quiz.questions.length;
+    const rows = quiz.questions.map((q, i) => {
+      const guess = quiz.guesses[i];
+      const actual = q.actual;
+      const diff = guess - actual;
+      const pct = (diff / actual) * 100;
+      const absPct = Math.abs(pct);
+      let badge = '';
+      if (absPct < 5) badge = '<span class="ml-2 text-xs bg-green-100 text-green-700 rounded-full px-2 py-0.5">Closest</span>';
+      const diffColor = diff > 0 ? 'text-red-600' : diff < 0 ? 'text-green-700' : 'text-gray-500';
+      return { q, guess, actual, diff, pct, absPct, badge, diffColor };
+    });
+
+    // Best/worst guess
+    const sorted = [...rows].sort((a, b) => a.absPct - b.absPct);
+    const best = sorted[0];
+    const worst = sorted[sorted.length - 1];
+
+    // Totals (only for bands with data)
+    const totalGuess = quiz.guesses.reduce((s, g) => s + g, 0);
+    const totalActual = quiz.questions.reduce((s, q) => s + q.actual, 0);
+    const totalDiff = totalGuess - totalActual;
+    const totalPct = (totalDiff / totalActual) * 100;
+
+    // National averages for comparison
+    const natAvgInfant = computeNationalAvg('infant', quiz.setting);
+    const natAvgTotal = AGE_BANDS.reduce((s, b) => {
+      const avg = computeNationalAvg(b.key, quiz.setting);
+      return s + (isNaN(avg) ? 0 : avg);
+    }, 0);
+
+    // Affordability context
+    const income = MEDIAN_INCOME[quiz.state];
+    const infantBand = quiz.questions.find(q => q.band.key === 'infant');
+    const infantActual = infantBand ? infantBand.actual : null;
+    const incomeContext = income && infantActual
+      ? `In ${quiz.state}, infant care alone at a ${quiz.setting === 'center' ? 'child care center' : 'family child care home'} averages <strong>${fmt(infantActual)}/year</strong> — approximately <strong>${((infantActual / income) * 100).toFixed(0)}%</strong> of the state's median household income of ${fmt(income)}.`
+      : null;
+
+    // vs national avg for total
+    const stateCenter = STATE_DATA[quiz.state];
+    const natVsState = stateCenter
+      ? (() => {
+          const stateTotal = AGE_BANDS.reduce((s, b) => {
+            const v = stateCenter[quiz.setting][b.key];
+            return s + (v || 0);
+          }, 0);
+          const diff = stateTotal - natAvgTotal;
+          const pct = (diff / natAvgTotal) * 100;
+          return pct >= 0
+            ? `${quiz.state}'s combined annual cost (${fmt(stateTotal)}) is <strong>${pct.toFixed(0)}% above</strong> the national average.`
+            : `${quiz.state}'s combined annual cost (${fmt(stateTotal)}) is <strong>${Math.abs(pct).toFixed(0)}% below</strong> the national average.`;
+        })()
+      : null;
+
+    const tableRows = rows.map((r, i) => {
+      const bestRow = r === best ? 'bg-green-50' : '';
+      const worstRow = r === worst && total > 1 ? 'bg-red-50' : '';
+      return `
+      <tr class="border-b border-gray-100 ${bestRow}${worstRow}">
+        <td class="py-3 pr-4">
+          <div class="font-medium text-gray-900 text-sm">${r.q.band.label}</div>
+          <div class="text-xs text-gray-400">${r.q.band.ageDesc}</div>
+        </td>
+        <td class="py-3 pr-4 text-right text-sm text-gray-600">${fmt(r.guess)}</td>
+        <td class="py-3 pr-4 text-right text-sm font-semibold text-gray-900">${fmt(r.actual)}</td>
+        <td class="py-3 text-right text-sm font-medium ${r.diffColor}">${fmtPct(r.pct)}</td>
+      </tr>`;
+    }).join('');
+
+    const shareSummary = buildShareText();
+
+    return `
+    <div class="flex flex-col min-h-screen">
+      <main class="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div class="card max-w-xl w-full p-8">
+          <div class="mb-6">
+            <span class="text-xs font-semibold uppercase tracking-widest text-blue-700 bg-blue-50 px-3 py-1 rounded-full">Results</span>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-1">Your guesses vs. actual costs</h2>
+          <p class="text-gray-500 text-sm mb-6">${quiz.state} · ${quiz.setting === 'center' ? 'Child Care Center' : 'Family Child Care Home'}</p>
+
+          <div class="overflow-x-auto mb-6">
+            <table class="w-full">
+              <thead>
+                <tr class="border-b-2 border-gray-200">
+                  <th class="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2 pr-4">Age group</th>
+                  <th class="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2 pr-4">Your guess</th>
+                  <th class="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2 pr-4">Actual</th>
+                  <th class="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2">Diff</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+              <tfoot>
+                <tr class="border-t-2 border-gray-300">
+                  <td class="pt-3 pr-4 font-bold text-gray-900 text-sm">Total</td>
+                  <td class="pt-3 pr-4 text-right text-sm text-gray-600 font-medium">${fmt(totalGuess)}</td>
+                  <td class="pt-3 pr-4 text-right text-sm font-bold text-gray-900">${fmt(totalActual)}</td>
+                  <td class="pt-3 text-right text-sm font-bold ${totalDiff > 0 ? 'text-red-600' : 'text-green-700'}">${fmtPct(totalPct)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          ${total > 1 ? `
+          <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-green-50 rounded-lg p-3 text-center">
+              <div class="text-xs text-green-600 font-semibold uppercase tracking-wide mb-1">Closest guess</div>
+              <div class="font-bold text-green-800 text-sm">${best.q.band.label}</div>
+              <div class="text-xs text-green-600">${fmtPct(best.pct)} off</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3 text-center">
+              <div class="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Furthest off</div>
+              <div class="font-bold text-gray-700 text-sm">${worst.q.band.label}</div>
+              <div class="text-xs text-gray-500">${fmtPct(worst.pct)} off</div>
+            </div>
+          </div>` : ''}
+
+          ${incomeContext || natVsState ? `
+          <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6 text-sm text-gray-700 space-y-2">
+            ${incomeContext ? `<p>${incomeContext}</p>` : ''}
+            ${natVsState ? `<p>${natVsState}</p>` : ''}
+            <p class="text-xs text-gray-400">
+              Median income: approximate 2023 Census ACS median household income for all households (not families with children).
+              National average is computed from CCAoA state data for the selected care setting.
+            </p>
+          </div>` : ''}
+
+          <div class="flex flex-col sm:flex-row gap-3 mb-2">
+            <button class="btn-primary flex-1" id="btn-restart">Try another state</button>
+            <button class="btn-ghost flex-1" id="btn-copy" data-text="${encodeURIComponent(shareSummary)}">
+              Copy results
+            </button>
+          </div>
+          <p id="copy-confirm" class="text-xs text-green-600 text-center hidden">Copied to clipboard!</p>
+        </div>
+      </main>
+      ${renderFooter()}
+    </div>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // SHARED COMPONENTS
+  // --------------------------------------------------------------------------
+
+  function renderProgress(current, total, revealed = false) {
+    const dots = Array.from({ length: total }, (_, i) => {
+      let cls = 'progress-step';
+      if (i < current) cls += ' done';
+      else if (i === current) cls += revealed ? ' done' : ' current';
+      return `<span class="${cls}"></span>`;
+    }).join('');
+    return `
+    <div class="flex items-center gap-3">
+      <div class="flex gap-1.5">${dots}</div>
+      <span class="text-sm text-gray-400">Age group ${current + 1} of ${total}</span>
+    </div>`;
+  }
+
+  function renderFooter() {
+    return `
+    <footer class="py-6 px-4 text-center">
+      <div class="max-w-xl mx-auto space-y-2">
+        <p class="text-xs text-gray-500">
+          Data: <a href="https://www.childcareaware.org/price-landscape24/" target="_blank" rel="noopener" class="underline hover:text-gray-700">Child Care in America: 2024 Price &amp; Supply</a>,
+          Child Care Aware® of America. Prices from January 2025 survey reflect 2024 annual averages
+          for licensed center-based care and family child care homes.
+        </p>
+        <p class="text-xs text-gray-400">
+          Methodology note: Prices are state averages and individual costs vary significantly.
+          Figures reflect what providers charge, which is often below the true cost of providing care.
+          CCAoA's age bands (Infant, Toddler, 4-Year-Old, School-Age) are mapped here to approximate
+          age ranges; exact definitions vary by state. New Mexico did not participate in the survey.
+          Data absent for some state/band combinations is omitted from the quiz.
+        </p>
+        <p class="text-xs text-gray-400">
+          Child care affordability is a policy issue affecting millions of American families.
+          High costs force families to reduce work hours, forgo care, or spend beyond their means —
+          while care workers remain among the lowest-paid professionals in the economy.
+        </p>
+      </div>
+    </footer>`;
+  }
+
+  // --------------------------------------------------------------------------
+  // SHARE TEXT
+  // --------------------------------------------------------------------------
+
+  function buildShareText() {
+    const lines = [
+      `Child Care Cost Quiz — ${quiz.state} (${quiz.setting === 'center' ? 'Child Care Center' : 'Family Child Care Home'})`,
+      '',
+    ];
+    quiz.questions.forEach((q, i) => {
+      const g = quiz.guesses[i];
+      const a = q.actual;
+      const pct = ((g - a) / a * 100).toFixed(1);
+      lines.push(`${q.band.label}: guessed ${fmt(g)}, actual ${fmt(a)} (${pct > 0 ? '+' : ''}${pct}%)`);
+    });
+    const totalGuess = quiz.guesses.reduce((s, g) => s + g, 0);
+    const totalActual = quiz.questions.reduce((s, q) => s + q.actual, 0);
+    lines.push('');
+    lines.push(`Total guessed: ${fmt(totalGuess)} | Actual total: ${fmt(totalActual)}`);
+    lines.push('');
+    lines.push('Source: Child Care Aware® of America 2024 Affordability Analysis');
+    return lines.join('\n');
+  }
+
+  // ==========================================================================
+  // EVENT HANDLERS
+  // ==========================================================================
+
+  function attachHandlers() {
+    switch (quiz.screen) {
+      case 'welcome': {
+        document.getElementById('btn-start').addEventListener('click', () => {
+          quiz.screen = 'setup';
+          render();
+        });
+        break;
+      }
+      case 'setup': {
+        document.getElementById('btn-back-welcome').addEventListener('click', () => {
+          quiz.screen = 'welcome';
+          render();
+        });
+
+        document.getElementById('state-select').addEventListener('change', e => {
+          quiz.state = e.target.value;
+          render();
+        });
+
+        document.querySelectorAll('input[name="setting"]').forEach(radio => {
+          radio.addEventListener('change', e => {
+            quiz.setting = e.target.value;
+            render();
+          });
+        });
+
+        document.getElementById('btn-begin').addEventListener('click', () => {
+          quiz.questions = buildQuestions(quiz.state, quiz.setting);
+          quiz.qIndex = 0;
+          quiz.guesses = [];
+          quiz.currentGuess = '';
+          if (quiz.questions.length === 0) return;
+          quiz.screen = 'question';
+          render();
+        });
+        break;
+      }
+      case 'question': {
+        const input = document.getElementById('guess-input');
+        const btn = document.getElementById('btn-submit-guess');
+
+        input.addEventListener('input', e => {
+          const formatted = formatInputValue(e.target.value);
+          e.target.value = formatted;
+          quiz.currentGuess = formatted;
+          btn.disabled = !parseGuess(formatted);
+        });
+
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter' && !btn.disabled) btn.click();
+        });
+
+        input.focus();
+
+        btn.addEventListener('click', () => {
+          const guess = parseGuess(quiz.currentGuess);
+          if (!guess) return;
+          quiz.guesses[quiz.qIndex] = guess;
+          quiz.screen = 'reveal';
+          render();
+        });
+        break;
+      }
+      case 'reveal': {
+        // Animate bars
+        const q = quiz.questions[quiz.qIndex];
+        const guess = quiz.guesses[quiz.qIndex];
+        const actual = q.actual;
+        const maxVal = Math.max(guess, actual);
+        const guessFill = Math.min(100, Math.round((guess / maxVal) * 100));
+
+        setTimeout(() => {
+          const barGuess = document.getElementById('bar-guess');
+          const barActual = document.getElementById('bar-actual');
+          if (barGuess) barGuess.style.width = guessFill + '%';
+          if (barActual) barActual.style.width = '100%';
+        }, 100);
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+          if (quiz.qIndex < quiz.questions.length - 1) {
+            quiz.qIndex++;
+            quiz.currentGuess = '';
+            quiz.screen = 'question';
+          } else {
+            quiz.screen = 'summary';
+          }
+          render();
+        });
+        break;
+      }
+      case 'summary': {
+        document.getElementById('btn-restart').addEventListener('click', () => {
+          quiz.screen = 'setup';
+          quiz.state = '';
+          quiz.setting = 'center';
+          quiz.questions = [];
+          quiz.guesses = [];
+          quiz.qIndex = 0;
+          quiz.currentGuess = '';
+          render();
+        });
+
+        document.getElementById('btn-copy').addEventListener('click', e => {
+          const text = decodeURIComponent(e.currentTarget.dataset.text);
+          navigator.clipboard.writeText(text).then(() => {
+            const confirm = document.getElementById('copy-confirm');
+            confirm.classList.remove('hidden');
+            setTimeout(() => confirm.classList.add('hidden'), 2500);
+          }).catch(() => {
+            // Fallback: select text
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+          });
+        });
+        break;
+      }
+    }
+  }
+
+  // ==========================================================================
+  // INIT
+  // ==========================================================================
+
+  render();
+  </script>
+</body>
+</html>
